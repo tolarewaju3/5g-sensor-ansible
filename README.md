@@ -35,7 +35,7 @@ For a quick deployment, we can use an Ansible playbook to setup our architecture
 
 First, login to the OpenShift API Server.
 
-`oc login -u <admin_username> -p <admin_password> <api_url`
+`oc login -u <admin_username> -p <admin_password> <api_url>`
 
 Then, run the playbook.
 
