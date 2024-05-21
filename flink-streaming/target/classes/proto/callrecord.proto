@@ -1,0 +1,39 @@
+// File name: callrecord.proto
+// Generated from : codelikethewind.CallRecordSchema
+
+syntax = "proto2";
+
+package org.codelikethewind;
+
+
+
+/**
+ * @Indexed
+ */
+message CallRecord {
+   
+   /**
+    * @Basic
+    */
+   optional int32 id = 1 [default = 1];
+   
+   /**
+    * @Basic
+    */
+   optional string location = 2;
+   
+   /**
+    * @Basic
+    */
+   optional fixed64 timestamp = 3;
+   
+   /**
+    * @Basic
+    */
+   optional string signalStrength = 4;
+   
+   /**
+    * @Basic
+    */
+   optional string network = 5;
+}
