@@ -1,0 +1,418 @@
+---
+- name: 5G Sensor Data Streaming Setup
+  hosts: all
+  tasks:
+
+    - name: Create AMQ Streams Operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: amq-streams
+            namespace: openshift-operators
+          spec:
+            channel: stable
+            installPlanApproval: Automatic
+            name: amq-streams
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+            startingCSV: amqstreams.v2.6.0-2
+
+    - name: Wait for amq streams operator to be ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: openshift-operators
+        label_selectors:
+          - name = amq-streams-cluster-operator
+        wait: yes
+
+    - name: Create Kafka Cluster
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: kafka.strimzi.io/v1beta2
+          kind: Kafka
+          metadata:
+            name: my-cluster
+            namespace: openshift-operators
+          spec:
+            kafka:
+              config:
+                default.replication.factor: 3
+                inter.broker.protocol.version: "3.6"
+                min.insync.replicas: 2
+                offsets.topic.replication.factor: 3
+                transaction.state.log.min.isr: 2
+                transaction.state.log.replication.factor: 3
+              listeners:
+              - name: plain
+                port: 9092
+                tls: false
+                type: internal
+              - name: tls
+                port: 9093
+                tls: true
+                type: internal
+              replicas: 3
+              storage:
+                type: ephemeral
+              version: 3.6.0
+            zookeeper:
+              replicas: 3
+              storage:
+                type: ephemeral
+
+    - name: Create Kafka Topic
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: kafka.strimzi.io/v1beta2
+          kind: KafkaTopic
+          metadata:
+            name: call-records
+            labels:
+              strimzi.io/cluster: my-cluster
+            namespace: openshift-operators
+          spec:
+            config:
+              retention.ms: 604800000
+              segment.bytes: 1073741824
+            partitions: 10
+            replicas: 3
+
+    - name: Create Data Grid Operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: datagrid
+            namespace: openshift-operators
+          spec:
+            channel: 8.4.x
+            installPlanApproval: Automatic
+            name: datagrid
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+            startingCSV: datagrid-operator.v8.4.15
+
+    - name: Wait for data grid operator to be ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: openshift-operators
+        label_selectors:
+          - app.kubernetes.io/name=infinispan-operator
+        wait: yes
+
+    - name: Create Data Grid Cluster
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: infinispan.org/v1
+          kind: Infinispan
+          metadata:
+            name: datagrid
+            namespace: openshift-operators
+          spec:
+            security:
+              authorization:
+                enabled: false
+              endpointEncryption:
+                type: None
+              endpointAuthentication: false
+            dependencies:
+              artifacts:
+                - maven: 'com.mysql:mysql-connector-j:8.3.0'
+            replicas: 1
+
+    - name: Create sensor database
+      community.okd.openshift_process:
+        name: mysql-ephemeral
+        namespace_target: openshift-operators
+        namespace: openshift # only needed if using a template already on the server
+        parameters:
+          NAMESPACE: openshift
+          DATABASE_SERVICE_NAME: sensordb
+          MYSQL_USER: tolarewaju3
+          MYSQL_PASSWORD: tolarewaju3
+          MYSQL_ROOT_PASSWORD: myP@ssword!
+          MYSQL_DATABASE: sensor
+        state: present
+      register: result
+
+    - name: Wait for sensor database to be running
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: openshift-operators
+        label_selectors:
+          - name = sensordb
+        wait: yes
+      register: pod
+
+    - set_fact:
+        sensord_db_pod: "{{ pod.resources[0].metadata.name }}"
+
+    - name: Create call record database
+      shell: |
+        oc exec {{ sensord_db_pod }} -- bash -c "mysql --user=tolarewaju3 --password=tolarewaju3 sensor -e 'CREATE TABLE IF NOT EXISTS call_record (id INT PRIMARY KEY,
+        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        location varchar(255),
+        signalStrength varchar(255),
+        network varchar(255));'"
+
+    
+    - name: Create Flink Operator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: flink-kubernetes-operator
+            namespace: openshift-operators
+          spec:
+            channel: alpha
+            installPlanApproval: Automatic
+            name: flink-kubernetes-operator
+            source: community-operators
+            sourceNamespace: openshift-marketplace
+            startingCSV: flink-kubernetes-operator.v1.6.0
+
+    - name: Wait for flink operator to be ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: openshift-operators
+        label_selectors:
+          - app.kubernetes.io/name=flink-kubernetes-operator
+        wait: yes
+
+    - name: Create Apache Flink Deployment
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: flink.apache.org/v1beta1
+          kind: FlinkDeployment
+          metadata:
+            name: flink-streaming
+            namespace: openshift-operators
+          spec:
+            image: 'flink:1.16'
+            flinkVersion: v1_16
+            flinkConfiguration:
+              taskmanager.numberOfTaskSlots: '2'
+            serviceAccount: flink
+            jobManager:
+              resource:
+                memory: 2048m
+                cpu: 1
+            taskManager:
+              resource:
+                memory: 2048m
+                cpu: 1
+
+    - name: Wait for flink deployment
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: openshift-operators
+        name: flink-streaming
+        wait: yes
+
+    - name: Create Apache Flink Route
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: route.openshift.io/v1
+          kind: Route
+          metadata:
+            name: flink-rest
+            namespace: openshift-operators
+            labels:
+              app: flink-streaming
+              type: flink-native-kubernetes
+          spec:
+            to:
+              kind: Service
+              name: flink-streaming-rest
+            tls: null
+            port:
+              targetPort: rest
+
+    - name: Wait for flink route to deploy
+      kubernetes.core.k8s_info:
+        kind: Route
+        namespace: openshift-operators
+        name: flink-rest
+        wait: yes
+      register: flink_route
+
+    - set_fact:
+        flink_url: "{{ flink_route.resources[0].spec.host }}"
+
+    - name: Download flink job
+      ansible.builtin.get_url:
+        url: https://code-like-the-wind.s3.us-east-2.amazonaws.com/flink-streaming-1.0.jar
+        dest: /tmp/flink-streaming-1.0.jar
+
+    - name: Upload flink job
+      shell: 'curl -X POST -H "Expect:" -F "jarfile=@/tmp/flink-streaming-1.0.jar"  \
+                    http://{{ flink_url }}/jars/upload'
+
+    - name: Get all flink jobs
+      shell: 'curl -X GET "http://{{ flink_url }}/jars"'
+      register: result
+
+    - set_fact:
+        stdout: "{{ result.stdout_lines[0] }}"
+
+    - set_fact:
+        job: "{{ stdout.files[0] }}"
+
+    - name: Run flink job
+      shell: 'curl -X POST "http://{{ flink_url }}/jars/{{ job.id }}/run?entry-class=com.demo.flink.streaming.StreamingJob"'
+
+
+    - name: Create Call Record Generator
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: call-record-generator
+            namespace: openshift-operators
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: call-record-generator
+            template:
+              metadata:
+                labels:
+                  app: call-record-generator
+              spec:
+                containers:
+                  - name: call-record-generator
+                    image: tolarewaju3/call-record-generator-amd64
+                    ports:
+                      - containerPort: 8080
+                        protocol: TCP
+
+    - name: Create database for metabase
+      community.okd.openshift_process:
+        name: mysql-ephemeral
+        namespace_target: openshift-operators
+        namespace: openshift # only needed if using a template already on the server
+        parameters:
+          NAMESPACE: openshift
+          DATABASE_SERVICE_NAME: metabasedb
+          MYSQL_USER: tolarewaju3
+          MYSQL_PASSWORD: tolarewaju3
+          MYSQL_ROOT_PASSWORD: myP@ssword!
+          MYSQL_DATABASE: metabase
+        state: present
+
+    - name: Wait for metabase database to deploy
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: openshift-operators
+        label_selectors:
+          - name = metabasedb
+        wait: yes
+      register: metabasedb
+
+    - set_fact:
+        metabase_db_pod: "{{ metabasedb.resources[0].metadata.name }}"
+
+    - name: Transfer database backup
+      shell: |
+        oc rsync ./database {{ metabase_db_pod }}:/opt/app-root/src/
+
+    - name: Restore metabase database
+      shell: |
+        oc exec {{ metabase_db_pod }} -- bash -c "mysql -u root --password=myP@ssword! -h 127.0.0.1 metabase < /opt/app-root/src/database/backup.sql"
+      ignore_errors: yes
+
+    - name: Create Metabase Container
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: metabase
+            namespace: openshift-operators
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: metabase
+            template:
+              metadata:
+                labels:
+                  app: metabase
+              spec:
+                containers:
+                  - name: metabase
+                    image: metabase/metabase
+                    ports:
+                      - containerPort: 3000
+                        protocol: TCP
+                    env:
+                      - name: MB_DB_TYPE
+                        value: mysql
+                      - name: MB_DB_DBNAME
+                        value: metabase
+                      - name: MB_DB_PORT
+                        value: '3306'
+                      - name: MB_DB_USER
+                        value: tolarewaju3
+                      - name: MB_DB_PASS
+                        value: tolarewaju3
+                      - name: MB_DB_HOST
+                        value: metabasedb
+
+    - name: Wait for maetabase to deploy
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: openshift-operators
+        name: metabase
+        wait: yes
+
+    - name: Create Service for metabase
+      community.okd.k8s:
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: metabase
+            namespace: openshift-operators
+          spec:
+            ports:
+            - name: 3000-tcp
+              port: 3000
+              targetPort: 3000
+              protocol: TCP
+            selector:
+              app: metabase
+        state: present
+
+    - name: Expose the metabase route
+      community.okd.openshift_route:
+        service: metabase
+        namespace: openshift-operators
+        state: present
+        termination: edge
+      register: metabase_route
+
+    - set_fact:
+        metabase_url: "{{ metabase_route.result.spec.host }}"
+
+    - name: Show Metabase URL
+      ansible.builtin.debug:
+        msg:
+        - "To see the dashboard, visit https://{{ metabase_url }}"
+        - "Username: someone@someone.com"
+        - "Password: GxJTgLlN3Nhtas"
