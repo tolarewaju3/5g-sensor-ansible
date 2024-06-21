@@ -5,20 +5,20 @@
   tasks:
 
     - name: Setup Kafka Cluster & Topic
-      import_tasks: kafka-tasks.yml
+      import_tasks: tasks/kafka-tasks.yml
 
     - name: Setup Data Grid
-      import_tasks: data-grid-tasks.yml
+      import_tasks: tasks/data-grid-tasks.yml
 
     - name: Setup Sensor Database
-      import_tasks: sensor-db-tasks.yml
+      import_tasks: tasks/sensor-db-tasks.yml
 
     - name: Setup Flink
-      import_tasks: flink-tasks.yml
+      import_tasks: tasks/flink-tasks.yml
 
     - name: Deploy Call Generator
-      import_tasks: call-generator-tasks.yml
+      import_tasks: tasks/call-generator-tasks.yml
 
     - name: Deploy Dashboard
-      import_tasks: dashboard-tasks.yml
+      import_tasks: tasks/dashboard-tasks.yml
 

@@ -28,11 +28,11 @@
 
 - name: Transfer database backup
   shell: |
-    oc rsync ./database {{ metabase_db_pod }}:/opt/app-root/src/
+    oc rsync ./database -n openshift-operators {{ metabase_db_pod }}:/opt/app-root/src/
 
 - name: Restore metabase database
   shell: |
-    oc exec {{ metabase_db_pod }} -- bash -c "mysql -u root --password=myP@ssword! -h 127.0.0.1 metabase < /opt/app-root/src/database/backup.sql"
+    oc exec -n openshift-operators {{ metabase_db_pod }} -- bash -c "mysql -u root --password=myP@ssword! -h 127.0.0.1 metabase < /opt/app-root/src/database/backup.sql"
   ignore_errors: yes
 
 - name: Create Metabase Container
