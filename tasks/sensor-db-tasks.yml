@@ -27,14 +27,12 @@
 - set_fact:
     sensord_db_pod: "{{ pod.resources[0].metadata.name }}"
 
-- name: Login on oc
-  shell: |
-    oc login -u kubeadmin -p KfqIs-WGJ9i-SIAiW-kHpjr https://api.cluster-4ntxs-1.dynamic.redhatworkshops.io:6443 --insecure-skip-tls-verify
-
 - name: Create call record database
-  shell: |
-    oc exec -n openshift-operators {{ sensord_db_pod }} -- bash -c "mysql --user=tolarewaju3 --password=tolarewaju3 sensor -e 'CREATE TABLE IF NOT EXISTS call_record (id INT PRIMARY KEY,
-    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    location varchar(255),
-    signalStrength varchar(255),
-    network varchar(255));'"
+    kubernetes.core.k8s_exec:
+      namespace: openshift-operators
+      pod: "{{ sensord_db_pod }}"
+      command: "mysql --user=tolarewaju3 --password=tolarewaju3 sensor -e 'CREATE TABLE IF NOT EXISTS call_record (id INT PRIMARY KEY,
+        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        location varchar(255),
+        signalStrength varchar(255),
+        network varchar(255));'"
