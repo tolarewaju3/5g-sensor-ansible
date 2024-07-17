@@ -29,7 +29,7 @@
 
 - name: Create call record database
   shell: |
-    kubectl exec -n openshift-operators {{ sensord_db_pod }} -- bash -c "mysql --user=tolarewaju3 --password=tolarewaju3 sensor -e 'CREATE TABLE IF NOT EXISTS call_record (id INT PRIMARY KEY,
+    oc exec -n openshift-operators {{ sensord_db_pod }} -- bash -c "mysql --user=tolarewaju3 --password=tolarewaju3 sensor -e 'CREATE TABLE IF NOT EXISTS call_record (id INT PRIMARY KEY,
     timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     location varchar(255),
     signalStrength varchar(255),
