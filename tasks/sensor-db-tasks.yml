@@ -29,7 +29,7 @@
 
 - name: Login on oc
   shell: |
-    oc login -u kubeadmin -p KfqIs-WGJ9i-SIAiW-kHpjr https://api.cluster-4ntxs-1.dynamic.redhatworkshops.io:6443 
+    oc login -u kubeadmin -p KfqIs-WGJ9i-SIAiW-kHpjr https://api.cluster-4ntxs-1.dynamic.redhatworkshops.io:6443 --insecure-skip-tls-verify
 
 - name: Create call record database
   shell: |
