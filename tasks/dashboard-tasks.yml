@@ -37,7 +37,7 @@
   kubernetes.core.k8s_exec:
     namespace: openshift-operators
     pod: "{{ metabase_db_pod }}"
-    command: "mysql -u root --password=myP@ssword! -h 127.0.0.1 metabase < /opt/app-root/src/database/backup.sql"
+    command: "bash -c 'mysql -u root --password=myP@ssword! -h 127.0.0.1 metabase < /opt/app-root/src/database/backup.sql'"
   ignore_errors: yes
 
 - name: Create Metabase Container
