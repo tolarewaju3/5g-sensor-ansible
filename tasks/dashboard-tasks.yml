@@ -27,8 +27,11 @@
     metabase_db_pod: "{{ metabasedb.resources[0].metadata.name }}"
 
 - name: Transfer database backup
-  shell: |
-    oc rsync ./database -n openshift-operators {{ metabase_db_pod }}:/opt/app-root/src/
+  kubernetes.core.k8s_cp:
+    namespace: openshift-operators
+    pod: "{{ metabase_db_pod }}"
+    remote_path: /opt/app-root/src/
+    local_path: ./database
 
 - name: Restore metabase database
   shell: |
