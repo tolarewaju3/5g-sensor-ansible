@@ -28,10 +28,10 @@
     sensord_db_pod: "{{ pod.resources[0].metadata.name }}"
 
 - name: Create call record database
-    kubernetes.core.k8s_exec:
-      namespace: openshift-operators
-      pod: "{{ sensord_db_pod }}"
-      command: "mysql --user=tolarewaju3 --password=tolarewaju3 sensor -e 'CREATE TABLE IF NOT EXISTS call_record (id INT PRIMARY KEY,
+  kubernetes.core.k8s_exec:
+    namespace: openshift-operators
+    pod: "{{ sensord_db_pod }}"
+    command: "mysql --user=tolarewaju3 --password=tolarewaju3 sensor -e 'CREATE TABLE IF NOT EXISTS call_record (id INT PRIMARY KEY,
         timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         location varchar(255),
         signalStrength varchar(255),
