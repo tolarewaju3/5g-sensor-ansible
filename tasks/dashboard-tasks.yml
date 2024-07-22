@@ -34,8 +34,10 @@
     local_path: ./database
 
 - name: Restore metabase database
-  shell: |
-    oc exec -n openshift-operators {{ metabase_db_pod }} -- bash -c "mysql -u root --password=myP@ssword! -h 127.0.0.1 metabase < /opt/app-root/src/database/backup.sql"
+  kubernetes.core.k8s_exec:
+    namespace: openshift-operators
+    pod: "{{ metabase_db_pod }}"
+    command: "mysql -u root --password=myP@ssword! -h 127.0.0.1 metabase < /opt/app-root/src/database/backup.sql"
   ignore_errors: yes
 
 - name: Create Metabase Container
