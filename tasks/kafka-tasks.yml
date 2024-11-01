@@ -14,7 +14,7 @@
         name: amq-streams
         source: redhat-operators
         sourceNamespace: openshift-marketplace
-        startingCSV: amqstreams.v2.6.0-2
+        startingCSV: amqstreams.v2.5.0-0
 
 - name: Wait for amq streams operator to be ready
   kubernetes.core.k8s_info:
