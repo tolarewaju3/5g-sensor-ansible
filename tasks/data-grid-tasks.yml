@@ -15,7 +15,7 @@
         name: datagrid
         source: redhat-operators
         sourceNamespace: openshift-marketplace
-        startingCSV: datagrid-operator.v8.4.8
+        startingCSV: datagrid-operator.v8.4.15
 
 - name: Wait for data grid operator to be ready
   kubernetes.core.k8s_info:
