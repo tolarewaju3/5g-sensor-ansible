@@ -69,7 +69,7 @@ After the operator finishes installing, **create a new data grid cluster.** On t
 
 **Switch to the YAML view.** Replace everything in the editor with the configuration below.
 
-```
+```yml
 apiVersion: infinispan.org/v1
 kind: Infinispan
 metadata:
@@ -121,7 +121,7 @@ Change the database to sensor.
 `USE sensor;`
 
 Create a table for our call records.
-```
+```sql
 CREATE TABLE call_record (
     id INT PRIMARY KEY,
     timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -142,7 +142,7 @@ After the operator finishes installing, **we’ll create a new Flink deployment.
 
 Switch the view to YAML and replace everything with the configuration below.
 
-```
+```yml
 kind: FlinkDeployment
 apiVersion: flink.apache.org/v1beta1
 metadata:
@@ -165,7 +165,7 @@ spec:
 ```
 We’ll also **create a route** so we can access the Flink deployment. On the right hand menu, click `Networking → Routes`. Click `Create route`, change to the YAML view, and replace everything in the editor with the configuration below.
 
-```
+```yml
 kind: Route
 apiVersion: route.openshift.io/v1
 metadata:
@@ -264,7 +264,7 @@ Name the dashboard `Sensor Data`. Click Create. And click save in the upper righ
 
 Next, **we’ll display the total calls received** on our dashboard. In the upper right corner, click `+ New → SQL Query`. Select our Sensor Data database and enter the query below.
 
-```
+```sql
 SELECT
   COUNT(*)
 FROM
@@ -276,7 +276,7 @@ Click the play button on the bottom right. You should see the number of calls di
 
 Next, **we'll display a table of all calls** on our dashboard. In the upper right corner, click `+New → SQL Query`. Select our Sensor Data database and enter the query below.
 
-```
+```sql
 SELECT
   `call_record`.`timestamp` AS `Time`,
   `call_record`.`location` AS `Location`,
@@ -293,7 +293,7 @@ Click the play button. You should see our call record data displayed in a table.
 
 **Next, add a graph of calls by location**. Click `+New → SQL Query`. Select the Sensor Data database and enter the query below.
 
-```
+```sql
 SELECT
   `call_record`.`location` AS `location`,
   COUNT(*) AS `count`
@@ -313,7 +313,7 @@ Click play on the bottom right. Hit the visualization button on the bottom left 
 
 Finally, **we'll display a pie chart of calls by network type.** Use the steps above and the query below.
 
-```
+```sql
 SELECT
   `call_record`.`network` AS `network`,
   COUNT(*) AS `count`
